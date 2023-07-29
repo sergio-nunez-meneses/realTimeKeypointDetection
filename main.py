@@ -1,4 +1,5 @@
 import tensorflow as tf
+import mediapipe as mp
 import cv2 as cv
 
 
@@ -9,19 +10,52 @@ if __name__ == "__main__":
             print("Error accessing webcam stream.")
             exit(1)
 
-        while True:
-            ret, frame = cap.read()
+        mp_drawing = mp.solutions.drawing_utils
+        mp_drawing_styles = mp.solutions.drawing_styles
+        mp_holistic = mp.solutions.holistic
 
-            if not ret:
-                print("No more frames to read.")
-                break
+        with mp_holistic.Holistic(
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        ) as holistic:
+            while True:
+                ret, frame = cap.read()
 
-            cv.imshow("Real-time keypoint detection", cv.flip(frame, 1))
+                if not ret:
+                    print("No more frames to read.")
+                    continue
 
-            if cv.waitKey(1) == 27:
-                break
+                # Get detection results
+                image = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+                image.flags.writeable = False
 
-        cap.release()
-        cv.destroyAllWindows()
+                results = holistic.process(image)
+
+                image.flags.writeable = True
+                image = cv.cvtColor(image, cv.COLOR_RGB2BGR)
+
+                # Draw landmarks
+                mp_drawing.draw_landmarks(
+                    image,
+                    results.left_hand_landmarks,
+                    mp_holistic.HAND_CONNECTIONS,
+                    mp_drawing_styles.get_default_hand_landmarks_style(),
+                    mp_drawing_styles.get_default_hand_connections_style()
+                )
+                mp_drawing.draw_landmarks(
+                    image,
+                    results.right_hand_landmarks,
+                    mp_holistic.HAND_CONNECTIONS,
+                    mp_drawing_styles.get_default_hand_landmarks_style(),
+                    mp_drawing_styles.get_default_hand_connections_style()
+                )
+
+                cv.imshow("Real-time keypoint detection", cv.flip(image, 1))
+
+                if cv.waitKey(1) == 27:
+                    break
+
+            cap.release()
+            cv.destroyAllWindows()
     else:
         print("MPS GPU is not available")
