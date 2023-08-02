@@ -13,7 +13,6 @@ class MultiThreadingVideoCapture:
 
         # Open video capture stream
         self.cap = cv.VideoCapture(self.source)
-        self.cap.set(cv.CAP_PROP_BUFFERSIZE, 2)
 
         if not self.cap.isOpened():
             print("Error accessing webcam stream.")
@@ -45,14 +44,8 @@ class MultiThreadingVideoCapture:
             self.ret, self.frame = self.cap.read()
 
             if not self.ret:
-                print("No more frames to read")
-
-                self.stopped = True
-
-                if self.source_is_live:
-                    continue
-                else:
-                    break
+                self.cap.set(cv.CAP_PROP_POS_FRAMES, 0)
+                continue
 
             if not self.source_is_live:
                 time.sleep(self.fps)
