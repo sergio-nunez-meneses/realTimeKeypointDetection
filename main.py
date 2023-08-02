@@ -1,17 +1,16 @@
 import tensorflow as tf
 import mediapipe as mp
-import time as t
 import cv2 as cv
 
 from threading import Thread
 
 
 class MultiThreadingVideoCapture:
-    def __init__(self, cam_id=0):
-        self.cam_id = cam_id
+    def __init__(self, source):
+        self.source = source
 
         # Open video capture stream
-        self.cap = cv.VideoCapture(self.cam_id)
+        self.cap = cv.VideoCapture(self.source)
         if not self.cap.isOpened():
             print("Error accessing webcam stream.")
             exit(1)
@@ -61,7 +60,7 @@ if __name__ == "__main__":
         mp_holistic = mp.solutions.holistic
 
         count_frames = 0
-        start = t.time()
+        start = cv.getTickCount()
 
         with mp_holistic.Holistic(
             min_detection_confidence=0.5,
@@ -104,10 +103,11 @@ if __name__ == "__main__":
 
                 if cv.waitKey(1) == 27:
                     break
+            end = cv.getTickCount()
+
             cap.stop()
 
-            end = t.time()
-            elapsed = end - start
+            elapsed = (end - start) / cv.getTickFrequency()
             fps = count_frames / elapsed
             print(f"FPS: {fps:.5f}, Elapsed time: {elapsed:.5f}, Frames processed: {count_frames}")
 
