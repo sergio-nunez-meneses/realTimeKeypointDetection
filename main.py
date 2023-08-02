@@ -1,6 +1,7 @@
 import tensorflow as tf
 import mediapipe as mp
 import cv2 as cv
+import time
 
 from threading import Thread
 
@@ -8,9 +9,12 @@ from threading import Thread
 class MultiThreadingVideoCapture:
     def __init__(self, source):
         self.source = source
+        self.source_is_live = not isinstance(self.source, str)
 
         # Open video capture stream
         self.cap = cv.VideoCapture(self.source)
+        self.cap.set(cv.CAP_PROP_BUFFERSIZE, 2)
+
         if not self.cap.isOpened():
             print("Error accessing webcam stream.")
             exit(1)
@@ -20,6 +24,9 @@ class MultiThreadingVideoCapture:
         if not self.ret:
             print("No more frames to read")
             exit(1)
+
+        self.fps = None if self.source_is_live else 1 / int(self.cap.get(cv.CAP_PROP_FPS))
+        self.fps_to_ms = 1 if self.source_is_live else int(self.fps * 1000)
 
         self.stopped = True
 
@@ -39,8 +46,16 @@ class MultiThreadingVideoCapture:
 
             if not self.ret:
                 print("No more frames to read")
+
                 self.stopped = True
-                break
+
+                if self.source_is_live:
+                    continue
+                else:
+                    break
+
+            if not self.source_is_live:
+                time.sleep(self.fps)
         self.cap.release()
 
     def read(self):
@@ -52,7 +67,7 @@ class MultiThreadingVideoCapture:
 
 if __name__ == "__main__":
     if len(tf.config.list_physical_devices("GPU")) > 0:
-        cap = MultiThreadingVideoCapture()
+        cap = MultiThreadingVideoCapture(0)
         cap.start()
 
         mp_drawing = mp.solutions.drawing_utils
@@ -101,7 +116,7 @@ if __name__ == "__main__":
 
                 cv.imshow("Real-time keypoint detection", cv.flip(image, 1))
 
-                if cv.waitKey(1) == 27:
+                if cv.waitKey(cap.fps_to_ms) == 27:
                     break
             end = cv.getTickCount()
 
