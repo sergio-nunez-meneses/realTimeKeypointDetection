@@ -15,7 +15,7 @@ class MultiThreadingVideoCapture:
         self.cap = cv.VideoCapture(self.source)
 
         if not self.cap.isOpened():
-            print("Error accessing webcam stream.")
+            print("Error accessing webcam stream")
             exit(1)
 
         # Read single frame from stream for initialization
@@ -67,12 +67,22 @@ if __name__ == "__main__":
         mp_drawing_styles = mp.solutions.drawing_styles
         mp_holistic = mp.solutions.holistic
 
+        hand_landmarks = [
+            "wrist", "thumb_cmc", "thumb_mcp", "thumb_ip", "thumb_tip", "index_finger_mcp", "index_finger_pip",
+            "index_finger_dip", "index_finger_tip", "middle_finger_mcp", "middle_finger_pip", "middle_finger_dip",
+            "middle_finger_tip", "ring_finger_mcp", "ring_finger_pip", "ring_finger_dip", "ring_finger_tip",
+            "pinky_mcp", "pinky_pip", "pinky_dip", "pinky_tip"
+        ]
+
+        allowed_landmarks = ["wrist", "thumb_tip", "index_finger_tip", "middle_finger_tip", "ring_finger_tip",
+                             "pinky_tip"]
+
         count_frames = 0
         start = cv.getTickCount()
 
         with mp_holistic.Holistic(
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.5
         ) as holistic:
             while True:
                 if cap.stopped:
@@ -89,21 +99,56 @@ if __name__ == "__main__":
                 image.flags.writeable = True
                 image = cv.cvtColor(image, cv.COLOR_RGB2BGR)
 
+                left_hand = results.left_hand_landmarks
+                right_hand = results.right_hand_landmarks
+
+                # Get coordinates from landmarks
+                if left_hand:
+                    for i in range(len(hand_landmarks)):
+                        landmark_name = hand_landmarks[i]
+
+                        if landmark_name in allowed_landmarks:
+                            hand_data = {
+                                landmark_name: {
+                                    "i": i + 1,
+                                    "x": left_hand.landmark[i].x,
+                                    "y": left_hand.landmark[i].y,
+                                    "z": left_hand.landmark[i].z
+                                }
+                            }
+                            # print("Left {0}: ".format(" ".join(landmark_name.split("_"))), hand_data[landmark_name])
+                if right_hand:
+                    for i in range(len(hand_landmarks)):
+                        landmark_name = hand_landmarks[i]
+
+                        if landmark_name in allowed_landmarks:
+                            hand_data = {
+                                landmark_name: {
+                                    "index": i + 1,
+                                    "x":     right_hand.landmark[i].x,
+                                    "y":     right_hand.landmark[i].y,
+                                    "z":     right_hand.landmark[i].z
+                                }
+                            }
+                            # print("Right {0}: ".format(" ".join(landmark_name.split("_"))), hand_data[landmark_name])
+
                 # Draw landmarks
-                mp_drawing.draw_landmarks(
-                    image,
-                    results.left_hand_landmarks,
-                    mp_holistic.HAND_CONNECTIONS,
-                    mp_drawing_styles.get_default_hand_landmarks_style(),
-                    mp_drawing_styles.get_default_hand_connections_style()
-                )
-                mp_drawing.draw_landmarks(
-                    image,
-                    results.right_hand_landmarks,
-                    mp_holistic.HAND_CONNECTIONS,
-                    mp_drawing_styles.get_default_hand_landmarks_style(),
-                    mp_drawing_styles.get_default_hand_connections_style()
-                )
+                if left_hand:
+                    mp_drawing.draw_landmarks(
+                        image,
+                        left_hand,
+                        mp_holistic.HAND_CONNECTIONS,
+                        mp_drawing_styles.get_default_hand_landmarks_style(),
+                        mp_drawing_styles.get_default_hand_connections_style()
+                    )
+                if right_hand:
+                    mp_drawing.draw_landmarks(
+                        image,
+                        right_hand,
+                        mp_holistic.HAND_CONNECTIONS,
+                        mp_drawing_styles.get_default_hand_landmarks_style(),
+                        mp_drawing_styles.get_default_hand_connections_style()
+                    )
 
                 count_frames += 1
 
