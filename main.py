@@ -4,6 +4,7 @@ import cv2 as cv
 import time
 
 from threading import Thread
+from pythonosc.udp_client import SimpleUDPClient
 
 
 class MultiThreadingVideoCapture:
@@ -77,6 +78,10 @@ if __name__ == "__main__":
         allowed_landmarks = ["wrist", "thumb_tip", "index_finger_tip", "middle_finger_tip", "ring_finger_tip",
                              "pinky_tip"]
 
+        ip = "127.0.0.1"
+        port = 7400
+        client = SimpleUDPClient(ip, port)
+
         count_frames = 0
         start = cv.getTickCount()
 
@@ -104,6 +109,8 @@ if __name__ == "__main__":
 
                 # Get coordinates from landmarks
                 if left_hand:
+                    client.send_message("/left_hand", "{\"isVisible\": True}")
+
                     for i in range(len(hand_landmarks)):
                         landmark_name = hand_landmarks[i]
 
@@ -117,7 +124,11 @@ if __name__ == "__main__":
                                 }
                             }
                             # print("Left {0}: ".format(" ".join(landmark_name.split("_"))), hand_data[landmark_name])
+                else:
+                    client.send_message("/left_hand", "{\"isVisible\": False}")
                 if right_hand:
+                    client.send_message("/right_hand", "{\"isVisible\": True}")
+
                     for i in range(len(hand_landmarks)):
                         landmark_name = hand_landmarks[i]
 
@@ -131,6 +142,8 @@ if __name__ == "__main__":
                                 }
                             }
                             # print("Right {0}: ".format(" ".join(landmark_name.split("_"))), hand_data[landmark_name])
+                else:
+                    client.send_message("/right_hand", "{\"isVisible\": False}")
 
                 # Draw landmarks
                 if left_hand:
