@@ -3,6 +3,7 @@ import mediapipe as mp
 import cv2 as cv
 import time
 import json
+import re
 
 from threading import Thread
 from pythonosc.dispatcher import Dispatcher
@@ -62,8 +63,46 @@ class MultiThreadingVideoCapture:
         self.stopped = True
 
 
-def check_udp_communication(address_pattern, arg):
-    print(f"{address_pattern}: {arg}")
+def check_udp_communication(address_pattern, *args):
+    errors = []
+
+    if address_pattern[1:] != "connect":
+        errors.append("OSC address pattern must be /connect")
+
+    if len(args) == 0:
+        errors.append("OSC argument must not be empty")
+    if len(args) > 1:
+        errors.append("OSC argument must not have more than 1 element")
+
+    message = args[0]
+    if not isinstance(message, str):
+        errors.append("OSC argument must be of type string")
+
+    match = re.search("{([^}]+)}", str(message))
+    if match is None:
+        errors.append("OSC parsed argument must be of type JSON object")
+    else:
+        response = json.loads(message)
+
+        if "errors" in response:
+            print_errors(errors)
+
+        if not isinstance(response["connected"], bool):
+            errors.append("OSC parsed value must be of type boolean")
+
+        if response["connected"]:
+            print(f"Successfully communicating with UDP client through port {client_port}")
+        else:
+            errors.append("Error while communicating with UDP client through port {}".format(client_port))
+
+    if len(errors) > 0:
+        print_errors(errors)
+
+
+def print_errors(errors):
+    for i in range(len(errors)):
+        print(errors[i])
+    exit(1)
 
 
 if __name__ == "__main__":
@@ -79,8 +118,6 @@ if __name__ == "__main__":
         server_port = 7300
         server = UDPServer((ip, server_port), disp)
         server.handle_request()
-
-        exit(0)
 
         cap = MultiThreadingVideoCapture(0)
         cap.start()
