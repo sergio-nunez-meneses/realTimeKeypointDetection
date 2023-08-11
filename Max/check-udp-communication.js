@@ -16,19 +16,19 @@ function anything() {
 		errors.push("OSC address pattern must be /connect");
 	}
 
-    if (arguments.length === 0) {
-        errors.push("OSC argument must not be empty");
-    }
-    if (arguments.length > 1) {
-    	errors.push("OSC argument must not have more than 1 element");
-    }
+	if (arguments.length === 0) {
+		errors.push("OSC argument must not be empty");
+	}
+	if (arguments.length > 1) {
+		errors.push("OSC argument must not have more than 1 element");
+	}
 
-    var message = arguments[0];
-    if (typeof message !== "string") {
-    	errors.push("OSC argument must be of type string");
-    }
+	var message = arguments[0];
+	if (typeof message !== "string") {
+		errors.push("OSC argument must be of type string");
+	}
 
-    var re = new RegExp(/\{([^}]+)\}/);
+	var re = new RegExp(/\{([^}]+)\}/);
 	var params = re.exec(message);
 	var response = {};
 	var parse;
@@ -54,5 +54,5 @@ function anything() {
 		response["connected"] = !parse["connected"] ? true : parse["connected"];
 	}
 
-    outlet(0, ["/connect", JSON.stringify(response)]);
+	outlet(0, ["/connect", JSON.stringify(response)]);
 }
