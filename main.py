@@ -2,9 +2,12 @@ import tensorflow as tf
 import mediapipe as mp
 import cv2 as cv
 import time
+import json
 
 from threading import Thread
-from pythonosc.udp_client import SimpleUDPClient
+from pythonosc.dispatcher import Dispatcher
+from pythonosc.udp_client import SimpleUDPClient as UDPClient
+from pythonosc.osc_server import BlockingOSCUDPServer as UDPServer
 
 
 class MultiThreadingVideoCapture:
@@ -59,8 +62,26 @@ class MultiThreadingVideoCapture:
         self.stopped = True
 
 
+def check_udp_communication(address_pattern, arg):
+    print(f"{address_pattern}: {arg}")
+
+
 if __name__ == "__main__":
     if len(tf.config.list_physical_devices("GPU")) > 0:
+        disp = Dispatcher()
+        disp.map("/connect", check_udp_communication)
+
+        ip = "127.0.0.1"
+        client_port = 7400
+        client = UDPClient(ip, client_port)
+        client.send_message("/connect", json.dumps({"connected": False}))
+
+        server_port = 7300
+        server = UDPServer((ip, server_port), disp)
+        server.handle_request()
+
+        exit(0)
+
         cap = MultiThreadingVideoCapture(0)
         cap.start()
 
@@ -77,10 +98,6 @@ if __name__ == "__main__":
 
         allowed_landmarks = ["wrist", "thumb_tip", "index_finger_tip", "middle_finger_tip", "ring_finger_tip",
                              "pinky_tip"]
-
-        ip = "127.0.0.1"
-        port = 7400
-        client = SimpleUDPClient(ip, port)
 
         count_frames = 0
         start = cv.getTickCount()
