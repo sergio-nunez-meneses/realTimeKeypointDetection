@@ -163,7 +163,7 @@ if __name__ == "__main__":
 
                 # Get coordinates from landmarks
                 if left_hand:
-                    client.send_message("/left_hand", "{\"isVisible\": True}")
+                    client.send_message("/left_hand", json.dumps({"isVisible": True}))
 
                     for i in range(len(hand_landmarks)):
                         landmark_name = hand_landmarks[i]
@@ -177,11 +177,11 @@ if __name__ == "__main__":
                                     "z": left_hand.landmark[i].z
                                 }
                             }
-                            # print("Left {0}: ".format(" ".join(landmark_name.split("_"))), hand_data[landmark_name])
+                            client.send_message("/left_hand", json.dumps(hand_data))
                 else:
-                    client.send_message("/left_hand", "{\"isVisible\": False}")
+                    client.send_message("/left_hand", json.dumps({"isVisible": False}))
                 if right_hand:
-                    client.send_message("/right_hand", "{\"isVisible\": True}")
+                    client.send_message("/right_hand", json.dumps({"isVisible": True}))
 
                     for i in range(len(hand_landmarks)):
                         landmark_name = hand_landmarks[i]
@@ -195,9 +195,9 @@ if __name__ == "__main__":
                                     "z":     right_hand.landmark[i].z
                                 }
                             }
-                            # print("Right {0}: ".format(" ".join(landmark_name.split("_"))), hand_data[landmark_name])
+                            client.send_message("/right_hand", json.dumps(hand_data))
                 else:
-                    client.send_message("/right_hand", "{\"isVisible\": False}")
+                    client.send_message("/right_hand", json.dumps({"isVisible": False}))
 
                 # Draw landmarks
                 if left_hand:
