@@ -14,33 +14,30 @@ var addresses = ["connect"];
 //  Functions
 // ============================================================================
 function anything() {
-	var errors = checkMessageFormat(messagename.slice(1), arguments);
+	var address  = messagename.slice(1);
+	var errors   = checkMessageFormat(address, arguments);
+	var response = {};
 
 	if (errors.length > 0) {
 		printErrors(errors);
 	}
 	else {
-		/*
-		var response = {};
-		var parse;
-		else {
-			parse = JSON.parse(message);
+		parse  = JSON.parse(arguments[0]);
+		errors = [];
 
+		if (address === "connect") {
 			if (typeof parse["connected"] !== "boolean") {
 				errors.push("OSC parsed value must be of type boolean");
 			}
-		}
 
-		if (errors.length > 0) {
-			printErrors(errors);
-
-			response["errors"] = errors.join(", ");
+			if (errors.length > 0) {
+				response["errors"] = errors.join(", ");
+			}
+			else {
+				response["connected"] = !parse["connected"] ? true : parse["connected"];
+			}
+			outlet(0, [messagename, JSON.stringify(response)]);
 		}
-		else {
-			response["connected"] = !parse["connected"] ? true : parse["connected"];
-		}
-		outlet(0, ["/connect", JSON.stringify(response)]);
-		*/
 	}
 }
 
@@ -63,7 +60,7 @@ function checkMessageFormat(address, data) {
 		errors.push("OSC argument must be of type string");
 	}
 
-	var re = new RegExp(/\{([^}]+)\}/);
+	var re     = new RegExp(/\{([^}]+)\}/);
 	var params = re.exec(message);
 
 	if (params === null) {
