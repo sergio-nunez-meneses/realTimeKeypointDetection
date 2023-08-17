@@ -43,8 +43,8 @@
 					"id" : "obj-3",
 					"maxclass" : "newobj",
 					"numinlets" : 1,
-					"numoutlets" : 1,
-					"outlettype" : [ "" ],
+					"numoutlets" : 2,
+					"outlettype" : [ "", "" ],
 					"patching_rect" : [ 75.0, 120.0, 173.0, 22.0 ],
 					"saved_object_attributes" : 					{
 						"filename" : "check-udp-communication.js",

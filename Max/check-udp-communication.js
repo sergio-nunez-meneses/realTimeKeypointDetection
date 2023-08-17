@@ -8,7 +8,7 @@ outlets   = 2;
 // ============================================================================
 //  Variables
 // ============================================================================
-var addresses = ["connect"];
+var addresses = ["connect", "left_hand", "right_hand"];
 
 // ============================================================================
 //  Functions
@@ -16,27 +16,32 @@ var addresses = ["connect"];
 function anything() {
 	var address  = messagename.slice(1);
 	var errors   = checkMessageFormat(address, arguments);
-	var response = {};
+	var response = {}
 
 	if (errors.length > 0) {
-		printErrors(errors);
+		handleErrorMessages(messagename, errors);
 	}
 	else {
-		parse  = JSON.parse(arguments[0]);
-		errors = [];
+		var parse  = JSON.parse(arguments[0]);
+		var errors = checkMessageValue(address, parse);
 
-		if (address === "connect") {
-			if (typeof parse["connected"] !== "boolean") {
-				errors.push("OSC parsed value must be of type boolean");
+		if (errors.length > 0) {
+			handleErrorMessages(messagename, errors);
+		}
+		else {
+			if (address === "connect") {
+				var response = {
+					"connected": !parse["connected"] ? true : parse["connected"],
+				}
+				sendToUdpServer(messagename, response);
 			}
+			else if (address.indexOf("_hand") !== -1) {
+				var key = Object.keys(parse)[0];
 
-			if (errors.length > 0) {
-				response["errors"] = errors.join(", ");
+				if (typeof parse[key] === "boolean") {
+					outlet(1, [messagename, parse[key]]);
+				}
 			}
-			else {
-				response["connected"] = !parse["connected"] ? true : parse["connected"];
-			}
-			outlet(0, [messagename, JSON.stringify(response)]);
 		}
 	}
 }
@@ -66,12 +71,29 @@ function checkMessageFormat(address, data) {
 	if (params === null) {
 		errors.push("OSC parsed argument must be of type JSON string");
 	}
-
 	return errors;
 }
 
-function printErrors(errors) {
-	for (var i = 0; i < errors.length; i++) {
-		post("Error: " + errors[i] + "\n");
+function checkMessageValue(address, data) {
+	var errors = [];
+
+	if (address === "connect" || address.indexOf("_hand") !== -1) {
+		var key = Object.keys(data)[0];
+
+		if (typeof data[key] !== "boolean") {
+			errors.push("OSC parsed value must be of type boolean");
+		}
 	}
+	return errors;
+}
+
+function sendToUdpServer(address, data) {
+	outlet(0, [address, JSON.stringify(data)]);
+}
+
+function handleErrorMessages(address, errors) {
+	response = {
+		"errors": errors.join(", "),
+	}
+	sendToUdpServer(address, response);
 }
