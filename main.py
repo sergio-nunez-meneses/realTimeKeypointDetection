@@ -85,7 +85,7 @@ def check_udp_communication(address_pattern, *args):
         response = json.loads(message)
 
         if "errors" in response:
-            print_errors(errors)
+            print_errors(response["errors"].split(", "))
 
         if not isinstance(response["connected"], bool):
             errors.append("OSC parsed value must be of type boolean")
@@ -118,6 +118,7 @@ if __name__ == "__main__":
         server_port = 7300
         server = UDPServer((ip, server_port), disp)
         server.handle_request()
+        disp.unmap("/connect", check_udp_communication)
 
         cap = MultiThreadingVideoCapture(0)
         cap.start()
