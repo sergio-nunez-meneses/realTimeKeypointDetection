@@ -63,62 +63,73 @@ class MultiThreadingVideoCapture:
         self.stopped = True
 
 
-def check_udp_communication(address_pattern, *args):
-    errors = []
+class UDPCommunicationHandler:
+    def __init__(self, ip, client_port, server_port):
+        self.dispatcher = Dispatcher()
 
-    if address_pattern[1:] != "connect":
-        errors.append("OSC address pattern must be /connect")
+        self.ip = ip
+        self.client_port = client_port
+        self.server_port = server_port
 
-    if len(args) == 0:
-        errors.append("OSC argument must not be empty")
-    if len(args) > 1:
-        errors.append("OSC argument must not have more than 1 element")
+        self.client = UDPClient(self.ip, self.client_port)
+        self.server = UDPServer((self.ip, self.server_port), self.dispatcher)
 
-    message = args[0]
-    if not isinstance(message, str):
-        errors.append("OSC argument must be of type string")
+    def send(self, address_pattern, data):
+        self.client.send_message(address_pattern, json.dumps(data))
 
-    match = re.search("{([^}]+)}", str(message))
-    if match is None:
-        errors.append("OSC parsed argument must be of type JSON object")
-    else:
-        response = json.loads(message)
+    def check_udp_communication(self, address_pattern):
+        # Open Max patch
 
-        if "errors" in response:
-            print_errors(response["errors"].split(", "))
+        self.dispatcher.map(address_pattern, self.check_message_format)
+        self.send(address_pattern, {"connected": False})
+        self.server.handle_request()
+        self.dispatcher.unmap(address_pattern, self.check_message_format)
 
-        if not isinstance(response["connected"], bool):
-            errors.append("OSC parsed value must be of type boolean")
+    def check_message_format(self, address_pattern, *args):
+        errors = []
 
-        if response["connected"]:
-            print(f"Successfully communicating with UDP client through port {client_port}")
+        if address_pattern[1:] != "connect":
+            errors.append("OSC address pattern must be /connect")
+
+        if len(args) == 0:
+            errors.append("OSC argument must not be empty")
+        if len(args) > 1:
+            errors.append("OSC argument must not have more than 1 element")
+
+        message = args[0]
+        if not isinstance(message, str):
+            errors.append("OSC argument must be of type string")
+
+        match = re.search("{([^}]+)}", str(message))
+        if match is None:
+            errors.append("OSC parsed argument must be of type JSON object")
         else:
-            errors.append("Error while communicating with UDP client through port {}".format(client_port))
+            response = json.loads(message)
 
-    if len(errors) > 0:
-        print_errors(errors)
+            if "errors" in response:
+                self.print_errors(response["errors"].split(", "))
 
+            if not isinstance(response["connected"], bool):
+                errors.append("OSC parsed value must be of type boolean")
 
-def print_errors(errors):
-    for i in range(len(errors)):
-        print(errors[i])
-    exit(1)
+            if response["connected"]:
+                print(f"Successfully communicating with UDP client through port {self.client_port}")
+            else:
+                errors.append("Error while communicating with UDP client through port {}".format(self.client_port))
+
+        if len(errors) > 0:
+            self.print_errors(errors)
+
+    def print_errors(self, errors):
+        for i in range(len(errors)):
+            print(errors[i])
+        exit(1)
 
 
 if __name__ == "__main__":
     if len(tf.config.list_physical_devices("GPU")) > 0:
-        disp = Dispatcher()
-        disp.map("/connect", check_udp_communication)
-
-        ip = "127.0.0.1"
-        client_port = 7400
-        client = UDPClient(ip, client_port)
-        client.send_message("/connect", json.dumps({"connected": False}))
-
-        server_port = 7300
-        server = UDPServer((ip, server_port), disp)
-        server.handle_request()
-        disp.unmap("/connect", check_udp_communication)
+        udp = UDPCommunicationHandler("127.0.0.1", 7400, 7300)  # ip, client_port, server_port
+        udp.check_udp_communication("/connect")
 
         cap = MultiThreadingVideoCapture(0)
         cap.start()
@@ -164,7 +175,7 @@ if __name__ == "__main__":
 
                 # Get coordinates from landmarks
                 if left_hand:
-                    client.send_message("/left_hand", json.dumps({"isVisible": True}))
+                    udp.send("/left_hand", {"isVisible": True})
 
                     for i in range(len(hand_landmarks)):
                         landmark_name = hand_landmarks[i]
@@ -178,11 +189,11 @@ if __name__ == "__main__":
                                     "z": left_hand.landmark[i].z
                                 }
                             }
-                            client.send_message("/left_hand", json.dumps(hand_data))
+                            udp.send("/left_hand", hand_data)
                 else:
-                    client.send_message("/left_hand", json.dumps({"isVisible": False}))
+                    udp.send("/left_hand", {"isVisible": False})
                 if right_hand:
-                    client.send_message("/right_hand", json.dumps({"isVisible": True}))
+                    udp.send("/right_hand", {"isVisible": True})
 
                     for i in range(len(hand_landmarks)):
                         landmark_name = hand_landmarks[i]
@@ -196,9 +207,9 @@ if __name__ == "__main__":
                                     "z":     right_hand.landmark[i].z
                                 }
                             }
-                            client.send_message("/right_hand", json.dumps(hand_data))
+                            udp.send("/right_hand", hand_data)
                 else:
-                    client.send_message("/right_hand", json.dumps({"isVisible": False}))
+                    udp.send("/right_hand", {"isVisible": False})
 
                 # Draw landmarks
                 if left_hand:
