@@ -8,7 +8,11 @@ outlets   = 2;
 // ============================================================================
 //  Variables
 // ============================================================================
-var addresses = ["connect", "left_hand", "right_hand"];
+var addresses  = ["connect", "left_hand", "right_hand"];
+var handsExist = {
+	"rh": false,
+	"lh": false,
+}
 
 // ============================================================================
 //  Functions
@@ -16,7 +20,7 @@ var addresses = ["connect", "left_hand", "right_hand"];
 function anything() {
 	var address  = messagename.slice(1);
 	var errors   = checkMessageFormat(address, arguments);
-	var response = {}
+	var response = {};
 
 	if (errors.length > 0) {
 		handleErrorMessages(messagename, errors);
@@ -35,11 +39,18 @@ function anything() {
 				}
 				sendToUdpServer(messagename, response);
 			}
-			else if (address.indexOf("_hand") !== -1) {
-				var key = Object.keys(parse)[0];
+			else if (contains(address, "_hand")) {
+				var key = getObjKey(parse);
 
 				if (typeof parse[key] === "boolean") {
-					outlet(1, [messagename, parse[key]]);
+					var hand         = contains(address, "right") ? "rh" : "lh";
+					handsExist[hand] = parse[key];
+				}
+				else {
+					if (handsExist["rh"] || handsExist["lh"]) {
+						var v = parse[key];
+						outlet(1, [messagename, key, v["i"], v["x"], v["y"], v["z"]]);
+					}
 				}
 			}
 		}
@@ -49,7 +60,7 @@ function anything() {
 function checkMessageFormat(address, data) {
 	var errors = [];
 
-	if (addresses.indexOf(address) === -1) {
+	if (!contains(addresses, address)) {
 		errors.push("OSC address pattern must be /connect, /left_hand, or /right_hand");
 	}
 
@@ -75,11 +86,10 @@ function checkMessageFormat(address, data) {
 }
 
 function checkMessageValue(address, data) {
+	var key    = getObjKey(data);
 	var errors = [];
 
-	if (address === "connect" || address.indexOf("_hand") !== -1) {
-		var key = Object.keys(data)[0];
-
+	if (address === "connect" || contains(address, "_hand") && contains(key.toLowerCase(), "visible")) {
 		if (typeof data[key] !== "boolean") {
 			errors.push("OSC parsed value must be of type boolean");
 		}
@@ -96,4 +106,12 @@ function handleErrorMessages(address, errors) {
 		"errors": errors.join(", "),
 	}
 	sendToUdpServer(address, response);
+}
+
+function getObjKey(obj) {
+	return Object.keys(obj)[0];
+}
+
+function contains(haystack, needle) {
+	return haystack.indexOf(needle) !== -1;
 }
