@@ -77,14 +77,16 @@ class UDPCommunicationHandler:
 		self.server = UDPServer((self.ip, self.server_port), self.dispatcher)
 
 	def send(self, address_pattern, data):
-		self.client.send_message(address_pattern, json.dumps(data))
+		self.client.send_message(address_pattern, data)
 
+	# TODO: Refactor method
 	def check_udp_communication(self, address_pattern):
 		self.dispatcher.map(address_pattern, self.check_message_format)
 		self.send(address_pattern, {"connected": False})
 		self.server.handle_request()
 		self.dispatcher.unmap(address_pattern, self.check_message_format)
 
+	# TODO: Refactor method
 	def check_message_format(self, address_pattern, *args):
 		errors = []
 
@@ -155,7 +157,6 @@ class HandLandmarksHandler:
 		self.image.flags.writeable = True
 		self.image = cv.cvtColor(self.image, cv.COLOR_RGB2BGR)
 
-	# TODO: Send data as list
 	def process_inference_data(self, udp, hand_names):
 		# TODO: Refactor dict initialization
 		self.landmarks["left_hand"] = self.results.left_hand_landmarks
@@ -163,29 +164,27 @@ class HandLandmarksHandler:
 
 		for x in range(len(hand_names)):
 			hand_name = hand_names[x]
-			address = "/{}".format(hand_name)
+			base_address = "/{}".format(hand_name)
 
 			# Get coordinates from landmarks
 			if self.landmarks[hand_name] is not None:
-				udp.send(address, {"isVisible": True})
+				# udp.send(address, {"isVisible": True})
+				udp.send("{}/visible".format(base_address), True)
 
 				for y in range(len(self.named_hand_landmarks)):
 					landmark_name = self.named_hand_landmarks[y]
 
 					if landmark_name in self.landmarks_to_render:
 						landmark_data = self.landmarks[hand_name].landmark[y]
+						# i = y + 1,
+						x = scale_to_range(landmark_data.x, [1, 0], [0, 1]),
+						y = landmark_data.y,
 						raw_z = landmark_data.z
 						z = raw_z * (10 ** count_zeros(raw_z))
+						z = z if landmark_name == "wrist" else scale_to_range(z, [0, -1], [0, 1])
 
-						hand_data = {
-							landmark_name: {
-								"i": y + 1,
-								"x": scale_to_range(landmark_data.x, [1, 0], [0, 1]),
-								"y": landmark_data.y,
-								"z": z if landmark_name == "wrist" else scale_to_range(z, [0, -1], [0, 1])
-							}
-						}
-						udp.send(address, hand_data)
+						hand_data = [x[0], y[0], z]
+						udp.send("{}/{}/xyz".format(base_address, landmark_name), hand_data)
 
 				# Draw landmarks
 				self.drawing.draw_landmarks(
@@ -196,7 +195,8 @@ class HandLandmarksHandler:
 					self.drawing_styles.get_default_hand_connections_style()
 				)
 			else:
-				udp.send(address, {"isVisible": False})
+				# udp.send(address, {"isVisible": False})
+				udp.send("{}/visible".format(base_address), False)
 
 
 def scale_to_range(value, min, max):
@@ -216,15 +216,15 @@ def print_errors(errors):
 if __name__ == "__main__":
 	if len(tf.config.list_physical_devices("GPU")) > 0:
 		udp = UDPCommunicationHandler("127.0.0.1", 9100, 7300)  # ip, client_port, server_port
-		udp.check_udp_communication("/connect")
+		# udp.check_udp_communication("/connect")
 
 		cap = MultiThreadingVideoCapture(0)
 		cap.start()
 
 		hands = HandLandmarksHandler(mp.solutions, 0.5, 0.5)
 
-		count_frames = 0
-		start = cv.getTickCount()
+		# count_frames = 0
+		# start = cv.getTickCount()
 
 		while True:
 			if cap.stopped:
@@ -237,19 +237,19 @@ if __name__ == "__main__":
 			# Set, send, and display detection results
 			hands.process_inference_data(udp, ["left_hand", "right_hand"])
 
-			count_frames += 1
+			# count_frames += 1
 
 			cv.imshow("Real-time keypoint detection", cv.flip(hands.image, 1))
 
 			if cv.waitKey(cap.fps_to_ms) == 27:
 				break
-		end = cv.getTickCount()
+		# end = cv.getTickCount()
 
 		cap.stop()
 
-		elapsed = (end - start) / cv.getTickFrequency()
-		fps = count_frames / elapsed
-		print(f"FPS: {fps:.5f}, Elapsed time: {elapsed:.5f}, Frames processed: {count_frames}")
+		# elapsed = (end - start) / cv.getTickFrequency()
+		# fps = count_frames / elapsed
+		# print(f"FPS: {fps:.5f}, Elapsed time: {elapsed:.5f}, Frames processed: {count_frames}")
 
 		cv.destroyAllWindows()
 	else:
