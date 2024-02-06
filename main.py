@@ -1,6 +1,7 @@
 import tensorflow as tf
 import mediapipe as mp
 import cv2 as cv
+import asyncio
 import time
 import json
 import re
@@ -9,6 +10,7 @@ from threading import Thread
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.udp_client import SimpleUDPClient as UDPClient
 from pythonosc.osc_server import BlockingOSCUDPServer as UDPServer
+from pythonosc.osc_server import AsyncIOOSCUDPServer as UServer
 
 from math import floor, log10, inf
 
@@ -65,6 +67,7 @@ class MultiThreadingVideoCapture:
 		self.stopped = True
 
 
+# TODO: Include async server and dispatcher
 class UDPCommunicationHandler:
 	def __init__(self, ip, client_port, server_port):
 		self.dispatcher = Dispatcher()
@@ -74,7 +77,7 @@ class UDPCommunicationHandler:
 		self.server_port = server_port
 
 		self.client = UDPClient(self.ip, self.client_port)
-		self.server = UDPServer((self.ip, self.server_port), self.dispatcher)
+		# self.server = UDPServer((self.ip, self.server_port), self.dispatcher)
 
 	def send(self, address_pattern, data):
 		self.client.send_message(address_pattern, data)
@@ -82,7 +85,7 @@ class UDPCommunicationHandler:
 	def check_udp_communication(self, address_pattern):
 		self.dispatcher.map(address_pattern, self.check_message_format)
 		self.send(address_pattern, {"connected": False})
-		self.server.handle_request()
+		# self.server.handle_request()
 		self.dispatcher.unmap(address_pattern, self.check_message_format)
 
 	def check_message_format(self, address_pattern, *args):
@@ -211,44 +214,67 @@ def print_errors(errors):
 	exit(1)
 
 
+def record_handler(address, *args):
+	print(f"{address}: {args}")
+
+
+async def start():
+	dispatcher = Dispatcher()
+	dispatcher.map("/record", record_handler)
+
+	server = UServer(("127.0.0.1", 7300), dispatcher, asyncio.get_event_loop())
+	transport, protocol = await server.create_serve_endpoint()
+
+	await run_detection()
+
+	transport.close()  # Clean up serve endpoint
+
+
+async def run_detection():
+	cap = MultiThreadingVideoCapture(0)
+	cap.start()
+
+	hands = HandLandmarksHandler(mp.solutions, 0.3, 0.3)
+
+	count_frames = 0
+	start = cv.getTickCount()
+
+	while True:
+		if cap.stopped:
+			break
+		else:
+			frame = cap.read()
+
+		# Get detection results
+		hands.run_inference(frame)
+		# Set, send, and display detection results
+		hands.process_inference_data(udp, ["left_hand", "right_hand"])
+
+		count_frames += 1
+
+		cv.imshow("Real-time keypoint detection", cv.flip(hands.image, 1))
+
+		if cv.waitKey(cap.fps_to_ms) == 27:
+			break
+
+		await asyncio.sleep(0)
+
+	end = cv.getTickCount()
+
+	cap.stop()
+
+	elapsed = (end - start) / cv.getTickFrequency()
+	fps = count_frames / elapsed
+	print(f"FPS: {fps:.5f}, Elapsed time: {elapsed:.5f}, Frames processed: {count_frames}")
+
+	cv.destroyAllWindows()
+
+
 if __name__ == "__main__":
 	if len(tf.config.list_physical_devices("GPU")) > 0:
 		udp = UDPCommunicationHandler("127.0.0.1", 9100, 7300)  # ip, client_port, server_port
 		# udp.check_udp_communication("/connect")  # TODO: Refactor methods check_udp_communication and check_message_format
 
-		cap = MultiThreadingVideoCapture(0)
-		cap.start()
-
-		hands = HandLandmarksHandler(mp.solutions, 0.5, 0.5)
-
-		count_frames = 0
-		start = cv.getTickCount()
-
-		while True:
-			if cap.stopped:
-				break
-			else:
-				frame = cap.read()
-
-			# Get detection results
-			hands.run_inference(frame)
-			# Set, send, and display detection results
-			hands.process_inference_data(udp, ["left_hand", "right_hand"])
-
-			count_frames += 1
-
-			cv.imshow("Real-time keypoint detection", cv.flip(hands.image, 1))
-
-			if cv.waitKey(cap.fps_to_ms) == 27:
-				break
-		end = cv.getTickCount()
-
-		cap.stop()
-
-		elapsed = (end - start) / cv.getTickFrequency()
-		fps = count_frames / elapsed
-		print(f"FPS: {fps:.5f}, Elapsed time: {elapsed:.5f}, Frames processed: {count_frames}")
-
-		cv.destroyAllWindows()
+		asyncio.run(start())
 	else:
 		print("MPS GPU is not available")
