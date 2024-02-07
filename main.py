@@ -257,7 +257,9 @@ if __name__ == "__main__":
 			if record and is_recording:
 				print("Recording...")
 				out.write(cv.flip(hands.image, 1))
+				udp.send("/record", True)
 			elif not record and is_recording:
+				udp.send("/record", False)
 				out.release()
 
 				is_recording = False
