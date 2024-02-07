@@ -31,6 +31,9 @@ class MultiThreadingVideoCapture:
 			print("No more frames to read")
 			exit(1)
 
+		self.width = int(self.cap.get(cv.CAP_PROP_FRAME_WIDTH))
+		self.height = int(self.cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+		self.raw_fps = int(self.cap.get(cv.CAP_PROP_FPS))
 		self.fps = None if self.source_is_live else 1 / int(self.cap.get(cv.CAP_PROP_FPS))
 		self.fps_to_ms = 1 if self.source_is_live else int(self.fps * 1000)
 
