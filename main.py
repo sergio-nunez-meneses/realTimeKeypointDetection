@@ -4,6 +4,7 @@ import cv2 as cv
 import time
 import json
 import re
+import os
 
 from threading import Thread
 from pythonosc.dispatcher import Dispatcher
@@ -11,6 +12,8 @@ from pythonosc.udp_client import SimpleUDPClient as UDPClient
 from pythonosc.osc_server import BlockingOSCUDPServer as UDPServer
 
 from math import floor, log10, inf
+
+from datetime import datetime
 
 
 class MultiThreadingVideoCapture:
@@ -226,6 +229,8 @@ if __name__ == "__main__":
 
 		record = False
 		is_recording = False
+		file_path = os.path.abspath(os.getcwd())
+		now = datetime.today().strftime("%Y%m%d%H%M%S")
 
 		count_frames = 0
 		start = cv.getTickCount()
