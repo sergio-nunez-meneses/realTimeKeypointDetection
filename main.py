@@ -229,8 +229,11 @@ if __name__ == "__main__":
 
 		record = False
 		is_recording = False
-		file_path = os.path.abspath(os.getcwd())
+		path = os.path.abspath(os.getcwd())
 		now = datetime.today().strftime("%Y%m%d%H%M%S")
+		four_cc = cv.VideoWriter_fourcc(*"mp4v")
+		out_size = (cap.width, cap.height)
+		out = cv.VideoWriter(f"{path}/output_data/output_{now}.mp4", four_cc, cap.raw_fps, out_size)
 
 		count_frames = 0
 		start = cv.getTickCount()
@@ -253,7 +256,10 @@ if __name__ == "__main__":
 
 			if record and is_recording:
 				print("Recording...")
+				out.write(cv.flip(hands.image, 1))
 			elif not record and is_recording:
+				out.release()
+
 				is_recording = False
 				print("Recording stopped")
 
