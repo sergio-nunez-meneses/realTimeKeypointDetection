@@ -238,15 +238,18 @@ async def start():
 
 
 async def run_detection():
+	record = False
+	is_recording = False
+
 	cap = MultiThreadingVideoCapture(0)
 	cap.start()
 
 	hands = HandLandmarksHandler(mp.solutions, 0.3, 0.3)
 
 	file_path = os.path.abspath(os.getcwd())
-	now = datetime.today().strftime('%Y%m%d%H%M%S')
+	now = datetime.today().strftime("%Y%m%d%H%M%S")
 	four_cc = cv.VideoWriter_fourcc(*'mp4v')
-	out = cv.VideoWriter(f"{file_path}/output_{now}.mp4", four_cc, cap.raw_fps, (cap.width, cap.height))
+	out = cv.VideoWriter(f"{file_path}/output_data/output_{now}.mp4", four_cc, cap.raw_fps, (cap.width, cap.height))
 
 	count_frames = 0
 	start = cv.getTickCount()
@@ -264,18 +267,31 @@ async def run_detection():
 
 		count_frames += 1
 
-		out.write(cv.flip(hands.image, 1))
+		if record:
+			is_recording = True
+
+		if record and is_recording:
+			print("Recording...")
+			out.write(cv.flip(hands.image, 1))
+		elif not record and is_recording:
+			out.release()
+			print("Recording stopped")
+
 		cv.imshow("Real-time keypoint detection", cv.flip(hands.image, 1))
 
-		if cv.waitKey(cap.fps_to_ms) == 27:
+		key = cv.waitKey(cap.fps_to_ms)
+		if key == 27:
 			break
+		elif key == 114:
+			record = True
+		elif key == 115:
+			record = False
 
 		await asyncio.sleep(0)
 
 	end = cv.getTickCount()
 
 	cap.stop()
-	# out.release()
 
 	elapsed = (end - start) / cv.getTickFrequency()
 	fps = count_frames / elapsed
