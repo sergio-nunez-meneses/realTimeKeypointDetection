@@ -5,6 +5,7 @@ import asyncio
 import time
 import json
 import re
+import os
 
 from threading import Thread
 from pythonosc.dispatcher import Dispatcher
@@ -13,6 +14,8 @@ from pythonosc.osc_server import BlockingOSCUDPServer as UDPServer
 from pythonosc.osc_server import AsyncIOOSCUDPServer as UServer
 
 from math import floor, log10, inf
+
+from datetime import datetime
 
 
 class MultiThreadingVideoCapture:
@@ -33,6 +36,9 @@ class MultiThreadingVideoCapture:
 			print("No more frames to read")
 			exit(1)
 
+		self.width = int(self.cap.get(cv.CAP_PROP_FRAME_WIDTH))
+		self.height = int(self.cap.get(cv.CAP_PROP_FRAME_HEIGHT))
+		self.raw_fps = int(self.cap.get(cv.CAP_PROP_FPS))
 		self.fps = None if self.source_is_live else 1 / int(self.cap.get(cv.CAP_PROP_FPS))
 		self.fps_to_ms = 1 if self.source_is_live else int(self.fps * 1000)
 
@@ -77,7 +83,8 @@ class UDPCommunicationHandler:
 		self.server_port = server_port
 
 		self.client = UDPClient(self.ip, self.client_port)
-		# self.server = UDPServer((self.ip, self.server_port), self.dispatcher)
+
+	# self.server = UDPServer((self.ip, self.server_port), self.dispatcher)
 
 	def send(self, address_pattern, data):
 		self.client.send_message(address_pattern, data)
@@ -236,6 +243,11 @@ async def run_detection():
 
 	hands = HandLandmarksHandler(mp.solutions, 0.3, 0.3)
 
+	file_path = os.path.abspath(os.getcwd())
+	now = datetime.today().strftime('%Y%m%d%H%M%S')
+	four_cc = cv.VideoWriter_fourcc(*'mp4v')
+	out = cv.VideoWriter(f"{file_path}/output_{now}.mp4", four_cc, cap.raw_fps, (cap.width, cap.height))
+
 	count_frames = 0
 	start = cv.getTickCount()
 
@@ -252,6 +264,7 @@ async def run_detection():
 
 		count_frames += 1
 
+		out.write(cv.flip(hands.image, 1))
 		cv.imshow("Real-time keypoint detection", cv.flip(hands.image, 1))
 
 		if cv.waitKey(cap.fps_to_ms) == 27:
@@ -262,6 +275,7 @@ async def run_detection():
 	end = cv.getTickCount()
 
 	cap.stop()
+	# out.release()
 
 	elapsed = (end - start) / cv.getTickFrequency()
 	fps = count_frames / elapsed
