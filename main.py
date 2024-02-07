@@ -221,6 +221,9 @@ if __name__ == "__main__":
 
 		hands = HandLandmarksHandler(mp.solutions, 0.5, 0.5)
 
+		record = False
+		is_recording = False
+
 		count_frames = 0
 		start = cv.getTickCount()
 
@@ -237,10 +240,24 @@ if __name__ == "__main__":
 
 			count_frames += 1
 
+			if record:
+				is_recording = True
+
+			if record and is_recording:
+				print("Recording...")
+			elif not record and is_recording:
+				is_recording = False
+				print("Recording stopped")
+
 			cv.imshow("Real-time keypoint detection", cv.flip(hands.image, 1))
 
-			if cv.waitKey(cap.fps_to_ms) == 27:
+			key = cv.waitKey(cap.fps_to_ms)
+			if key == 27:
 				break
+			elif key == 114:
+				record = True
+			elif key == 115:
+				record = False
 		end = cv.getTickCount()
 
 		cap.stop()
