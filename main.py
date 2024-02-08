@@ -26,8 +26,10 @@ if __name__ == "__main__":
 
 			# Get detection results
 			results = hands.get_data(frame)
-			# Set, send, and display detection results
+			# Set and send detection results
 			hands.process_data(results, udp)
+			# Display detection
+			hands.display_data()
 
 			count_frames += 1
 
