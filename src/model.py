@@ -26,8 +26,6 @@ class Model:
 		self.drawing_styles = self.solution.drawing_styles
 
 		self.image = None
-		self.results = None
-		self.conn = None
 
 	def get_data(self, frame):
 		self.image = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
@@ -42,7 +40,7 @@ class Model:
 
 	def process_data(self, data, udp):
 		# TODO: Refactor dict initialization
-		hand_names = ["left_hand", "right_hand"]
+		hand_names = list(self.landmarks.keys())
 		self.landmarks["left_hand"] = data.left_hand_landmarks
 		self.landmarks["right_hand"] = data.right_hand_landmarks
 
@@ -70,8 +68,16 @@ class Model:
 
 						landmark_address = "{}/{}/xyz".format(base_address, landmark_name)
 						udp.send(landmark_address, hand_data)
+			else:
+				udp.send(visible_address, False)
 
-				# Draw landmarks
+	def display_data(self):
+		hand_names = list(self.landmarks.keys())
+
+		for x in range(len(hand_names)):
+			hand_name = hand_names[x]
+
+			if self.landmarks[hand_name] is not None:
 				self.drawing.draw_landmarks(
 					self.image,
 					self.landmarks[hand_name],
@@ -79,8 +85,7 @@ class Model:
 					self.drawing_styles.get_default_hand_landmarks_style(),
 					self.drawing_styles.get_default_hand_connections_style()
 				)
-			else:
-				udp.send(visible_address, False)
+
 
 
 def scale_to_range(value, min, max):
