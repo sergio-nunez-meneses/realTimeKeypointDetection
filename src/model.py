@@ -20,8 +20,8 @@ class Model:
 		}
 
 		self.solution = mp.solutions
-		self.inference = self.solution.holistic.Holistic(min_detection_confidence=min_detection_confidence,
-		                                                 min_tracking_confidence=min_tracking_confidence)
+		self.model = self.solution.holistic.Holistic(min_detection_confidence=min_detection_confidence,
+		                                             min_tracking_confidence=min_tracking_confidence)
 		self.drawing = self.solution.drawing_utils
 		self.drawing_styles = self.solution.drawing_styles
 
@@ -29,19 +29,22 @@ class Model:
 		self.results = None
 		self.conn = None
 
-	def run_inference(self, frame):
+	def get_data(self, frame):
 		self.image = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
 		self.image.flags.writeable = False
 
-		self.results = self.inference.process(self.image)
+		results = self.model.process(self.image)
 
 		self.image.flags.writeable = True
 		self.image = cv.cvtColor(self.image, cv.COLOR_RGB2BGR)
 
-	def process_inference_data(self, udp, hand_names):
+		return results
+
+	def process_data(self, data, udp):
 		# TODO: Refactor dict initialization
-		self.landmarks["left_hand"] = self.results.left_hand_landmarks
-		self.landmarks["right_hand"] = self.results.right_hand_landmarks
+		hand_names = ["left_hand", "right_hand"]
+		self.landmarks["left_hand"] = data.left_hand_landmarks
+		self.landmarks["right_hand"] = data.right_hand_landmarks
 
 		for x in range(len(hand_names)):
 			hand_name = hand_names[x]

@@ -25,9 +25,9 @@ if __name__ == "__main__":
 				frame = cap.read()
 
 			# Get detection results
-			hands.run_inference(frame)
+			results = hands.get_data(frame)
 			# Set, send, and display detection results
-			hands.process_inference_data(udp, ["left_hand", "right_hand"])
+			hands.process_data(results, udp)
 
 			count_frames += 1
 
