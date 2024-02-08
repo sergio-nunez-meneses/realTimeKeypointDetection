@@ -19,9 +19,6 @@ from datetime import datetime
 class MultiThreadingVideoCapture:
 	def __init__(self, source):
 		self.source = source
-		self.source_is_live = not isinstance(self.source, str)
-
-		# Open video capture stream
 		self.cap = cv.VideoCapture(self.source)
 
 		if not self.cap.isOpened():
@@ -34,11 +31,14 @@ class MultiThreadingVideoCapture:
 			print("No more frames to read")
 			exit(1)
 
-		self.width = int(self.cap.get(cv.CAP_PROP_FRAME_WIDTH))
-		self.height = int(self.cap.get(cv.CAP_PROP_FRAME_HEIGHT))
-		self.raw_fps = int(self.cap.get(cv.CAP_PROP_FPS))
+		self.source_is_live = not isinstance(self.source, str)
+
 		self.fps = None if self.source_is_live else 1 / int(self.cap.get(cv.CAP_PROP_FPS))
 		self.fps_to_ms = 1 if self.source_is_live else int(self.fps * 1000)
+
+		self.is_recording = False
+		self.record = False
+		self.writer = None
 
 		self.stopped = True
 
@@ -69,6 +69,36 @@ class MultiThreadingVideoCapture:
 
 	def stop(self):
 		self.stopped = True
+
+	def set_record(self):
+		path = os.path.abspath(os.getcwd())
+		now = datetime.today().strftime("%Y%m%d%H%M%S")
+		filename = f"{path}/output_data/output_{now}.mp4"
+
+		self.writer = cv.VideoWriter(filename, cv.VideoWriter_fourcc(*"mp4v"), int(self.cap.get(cv.CAP_PROP_FPS)),
+		                             (int(self.cap.get(cv.CAP_PROP_FRAME_WIDTH)),
+		                              int(self.cap.get(cv.CAP_PROP_FRAME_HEIGHT))))
+		self.record = True
+
+	def handle_record(self, stream, udp):
+		if self.record:
+			self.is_recording = True
+
+		if self.record and self.is_recording:
+			self.writer.write(cv.flip(stream, 1))
+			print("Recording...")
+
+			udp.send("/record", True)
+		elif not self.record and self.is_recording:
+			udp.send("/record", False)
+
+			self.writer.release()
+			print("Recording stopped")
+
+			self.is_recording = False
+
+	def stop_record(self):
+		self.record = False
 
 
 class UDPCommunicationHandler:
@@ -227,14 +257,6 @@ if __name__ == "__main__":
 
 		hands = HandLandmarksHandler(mp.solutions, 0.5, 0.5)
 
-		record = False
-		is_recording = False
-		path = os.path.abspath(os.getcwd())
-		now = datetime.today().strftime("%Y%m%d%H%M%S")
-		four_cc = cv.VideoWriter_fourcc(*"mp4v")
-		out_size = (cap.width, cap.height)
-		out = cv.VideoWriter(f"{path}/output_data/output_{now}.mp4", four_cc, cap.raw_fps, out_size)
-
 		count_frames = 0
 		start = cv.getTickCount()
 
@@ -251,19 +273,7 @@ if __name__ == "__main__":
 
 			count_frames += 1
 
-			if record:
-				is_recording = True
-
-			if record and is_recording:
-				print("Recording...")
-				out.write(cv.flip(hands.image, 1))
-				udp.send("/record", True)
-			elif not record and is_recording:
-				udp.send("/record", False)
-				out.release()
-
-				is_recording = False
-				print("Recording stopped")
+			cap.handle_record(hands.image, udp)
 
 			cv.imshow("Real-time keypoint detection", cv.flip(hands.image, 1))
 
@@ -271,9 +281,9 @@ if __name__ == "__main__":
 			if key == 27:
 				break
 			elif key == 114:
-				record = True
+				cap.set_record()
 			elif key == 115:
-				record = False
+				cap.stop_record()
 		end = cv.getTickCount()
 
 		cap.stop()
