@@ -1,7 +1,6 @@
 import tensorflow as tf
 import mediapipe as mp
 import cv2 as cv
-import asyncio
 import time
 import json
 import re
@@ -11,7 +10,6 @@ from threading import Thread
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.udp_client import SimpleUDPClient as UDPClient
 from pythonosc.osc_server import BlockingOSCUDPServer as UDPServer
-from pythonosc.osc_server import AsyncIOOSCUDPServer as UServer
 
 from math import floor, log10, inf
 
@@ -21,9 +19,6 @@ from datetime import datetime
 class MultiThreadingVideoCapture:
 	def __init__(self, source):
 		self.source = source
-		self.source_is_live = not isinstance(self.source, str)
-
-		# Open video capture stream
 		self.cap = cv.VideoCapture(self.source)
 
 		if not self.cap.isOpened():
@@ -36,11 +31,14 @@ class MultiThreadingVideoCapture:
 			print("No more frames to read")
 			exit(1)
 
-		self.width = int(self.cap.get(cv.CAP_PROP_FRAME_WIDTH))
-		self.height = int(self.cap.get(cv.CAP_PROP_FRAME_HEIGHT))
-		self.raw_fps = int(self.cap.get(cv.CAP_PROP_FPS))
+		self.source_is_live = not isinstance(self.source, str)
+
 		self.fps = None if self.source_is_live else 1 / int(self.cap.get(cv.CAP_PROP_FPS))
 		self.fps_to_ms = 1 if self.source_is_live else int(self.fps * 1000)
+
+		self.is_recording = False
+		self.record = False
+		self.writer = None
 
 		self.stopped = True
 
@@ -72,8 +70,37 @@ class MultiThreadingVideoCapture:
 	def stop(self):
 		self.stopped = True
 
+	def set_record(self):
+		path = os.path.abspath(os.getcwd())
+		now = datetime.today().strftime("%Y%m%d%H%M%S")
+		filename = f"{path}/output_data/output_{now}.mp4"
 
-# TODO: Include async server and dispatcher
+		self.writer = cv.VideoWriter(filename, cv.VideoWriter_fourcc(*"mp4v"), int(self.cap.get(cv.CAP_PROP_FPS)),
+		                             (int(self.cap.get(cv.CAP_PROP_FRAME_WIDTH)),
+		                              int(self.cap.get(cv.CAP_PROP_FRAME_HEIGHT))))
+		self.record = True
+
+	def handle_record(self, stream, udp):
+		if self.record:
+			self.is_recording = True
+
+		if self.record and self.is_recording:
+			self.writer.write(cv.flip(stream, 1))
+			print("Recording...")
+
+			udp.send("/record", True)
+		elif not self.record and self.is_recording:
+			udp.send("/record", False)
+
+			self.writer.release()
+			print("Recording stopped")
+
+			self.is_recording = False
+
+	def stop_record(self):
+		self.record = False
+
+
 class UDPCommunicationHandler:
 	def __init__(self, ip, client_port, server_port):
 		self.dispatcher = Dispatcher()
@@ -83,8 +110,7 @@ class UDPCommunicationHandler:
 		self.server_port = server_port
 
 		self.client = UDPClient(self.ip, self.client_port)
-
-	# self.server = UDPServer((self.ip, self.server_port), self.dispatcher)
+		self.server = UDPServer((self.ip, self.server_port), self.dispatcher)
 
 	def send(self, address_pattern, data):
 		self.client.send_message(address_pattern, data)
@@ -92,7 +118,7 @@ class UDPCommunicationHandler:
 	def check_udp_communication(self, address_pattern):
 		self.dispatcher.map(address_pattern, self.check_message_format)
 		self.send(address_pattern, {"connected": False})
-		# self.server.handle_request()
+		self.server.handle_request()
 		self.dispatcher.unmap(address_pattern, self.check_message_format)
 
 	def check_message_format(self, address_pattern, *args):
@@ -221,90 +247,51 @@ def print_errors(errors):
 	exit(1)
 
 
-def record_handler(address, *args):
-	print(f"{address}: {args}")
-
-
-async def start():
-	dispatcher = Dispatcher()
-	dispatcher.map("/record", record_handler)
-
-	server = UServer(("127.0.0.1", 7300), dispatcher, asyncio.get_event_loop())
-	transport, protocol = await server.create_serve_endpoint()
-
-	await run_detection()
-
-	transport.close()  # Clean up serve endpoint
-
-
-async def run_detection():
-	record = False
-	is_recording = False
-
-	cap = MultiThreadingVideoCapture(0)
-	cap.start()
-
-	hands = HandLandmarksHandler(mp.solutions, 0.3, 0.3)
-
-	file_path = os.path.abspath(os.getcwd())
-	now = datetime.today().strftime("%Y%m%d%H%M%S")
-	four_cc = cv.VideoWriter_fourcc(*'mp4v')
-	out = cv.VideoWriter(f"{file_path}/output_data/output_{now}.mp4", four_cc, cap.raw_fps, (cap.width, cap.height))
-
-	count_frames = 0
-	start = cv.getTickCount()
-
-	while True:
-		if cap.stopped:
-			break
-		else:
-			frame = cap.read()
-
-		# Get detection results
-		hands.run_inference(frame)
-		# Set, send, and display detection results
-		hands.process_inference_data(udp, ["left_hand", "right_hand"])
-
-		count_frames += 1
-
-		if record:
-			is_recording = True
-
-		if record and is_recording:
-			print("Recording...")
-			out.write(cv.flip(hands.image, 1))
-		elif not record and is_recording:
-			out.release()
-			print("Recording stopped")
-
-		cv.imshow("Real-time keypoint detection", cv.flip(hands.image, 1))
-
-		key = cv.waitKey(cap.fps_to_ms)
-		if key == 27:
-			break
-		elif key == 114:
-			record = True
-		elif key == 115:
-			record = False
-
-		await asyncio.sleep(0)
-
-	end = cv.getTickCount()
-
-	cap.stop()
-
-	elapsed = (end - start) / cv.getTickFrequency()
-	fps = count_frames / elapsed
-	print(f"FPS: {fps:.5f}, Elapsed time: {elapsed:.5f}, Frames processed: {count_frames}")
-
-	cv.destroyAllWindows()
-
-
 if __name__ == "__main__":
 	if len(tf.config.list_physical_devices("GPU")) > 0:
 		udp = UDPCommunicationHandler("127.0.0.1", 9100, 7300)  # ip, client_port, server_port
 		# udp.check_udp_communication("/connect")  # TODO: Refactor methods check_udp_communication and check_message_format
 
-		asyncio.run(start())
+		cap = MultiThreadingVideoCapture(0)
+		cap.start()
+
+		hands = HandLandmarksHandler(mp.solutions, 0.5, 0.5)
+
+		count_frames = 0
+		start = cv.getTickCount()
+
+		while True:
+			if cap.stopped:
+				break
+			else:
+				frame = cap.read()
+
+			# Get detection results
+			hands.run_inference(frame)
+			# Set, send, and display detection results
+			hands.process_inference_data(udp, ["left_hand", "right_hand"])
+
+			count_frames += 1
+
+			cap.handle_record(hands.image, udp)
+
+			cv.imshow("Real-time keypoint detection", cv.flip(hands.image, 1))
+
+			key = cv.waitKey(cap.fps_to_ms)
+			if key == 27:
+				break
+			elif key == 114:
+				cap.set_record()
+			elif key == 115:
+				cap.stop_record()
+		end = cv.getTickCount()
+
+		cap.stop()
+
+		elapsed = (end - start) / cv.getTickFrequency()
+		fps = count_frames / elapsed
+		print(f"FPS: {fps:.5f}, Elapsed time: {elapsed:.5f}, Frames processed: {count_frames}")
+
+		cv.destroyAllWindows()
 	else:
 		print("MPS GPU is not available")
