@@ -24,13 +24,11 @@ if __name__ == "__main__":
 			else:
 				frame = cap.read()
 
-			# Get detection results
+			# Handle detection results
 			results = hands.get_data(frame)
-			# Set and send detection results
 			norm_data = hands.process_data(results)
 			hands.send_data(norm_data, udp)
-			# Display detection
-			# hands.display_data()
+			hands.display_data(results)
 
 			count_frames += 1
 
