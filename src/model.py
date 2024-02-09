@@ -38,74 +38,33 @@ class Model:
 
 		return results
 
-	def process_data(self, data, udp):
+	def process_data(self, data):
+		norm_data = []
+
 		if data.multi_hand_landmarks:
 			for hand_id, hand_landmarks in enumerate(data.multi_hand_landmarks):
 				hand_info = data.multi_handedness[hand_id].classification[0]
 
 				if hand_info.score > 0.95:
-					print(hand_info.label)
+					base_address = "/{}".format(hand_info.label.lower())
+					# visible_address = "{}/visible".format(base_address)
 
-				for landmark_id, landmark_data in enumerate(hand_landmarks.landmark):
-					landmark_name = self.named_hand_landmarks[landmark_id]
+					for landmark_id, raw_landmark_data in enumerate(hand_landmarks.landmark):
+						landmark_name = self.named_hand_landmarks[landmark_id]
+						landmark_address = "{}/{}/xyz".format(base_address, landmark_name)
+						norm_landmark_data = {}
 
-					if landmark_name in self.landmarks_to_render:
-						x = scale_to_range(landmark_data.x, [1, 0], [0, 1])
-						y = landmark_data.y
-						raw_z = landmark_data.z
-						z = raw_z * (10 ** count_zeros(raw_z))
-						z = z if landmark_name == "wrist" else scale_to_range(z, [0, -1], [0, 1])
-						# hand_data = [x[0], y[0], z]
-						print(landmark_name, x, y, z)
+						if landmark_name in self.landmarks_to_render:
+							norm_x = scale_to_range(raw_landmark_data.x, [1, 0], [0, 1])
+							y = raw_landmark_data.y
+							raw_z = raw_landmark_data.z
+							z = raw_z * (10 ** count_zeros(raw_z))
+							norm_z = z if landmark_name == "wrist" else scale_to_range(z, [0, -1], [0, 1])
 
-						# landmark_address = "{}/{}/xyz".format(base_address, landmark_name)
-
-			# base_address = "/{}".format(hand_name)
-			# visible_address = "{}/visible".format(base_address)
-
-			# for hand in data.multi_handedness:
-			# 	info = hand.classification[0]
-			#
-			# 	if info.score > 0.95:
-			# 		hands_name.append(info.label)
-
-			# len(data.multi_hand_landmarks) is 1 or 2
-			# len(hands_name) is 1 or 2
-
-			# for hand_landmarks in data.multi_hand_landmarks:
-			# 	print(hand_landmarks)
-
-		# TODO: Refactor dict initialization
-		# hand_names = list(self.landmarks.keys())
-		# self.landmarks["left_hand"] = data.left_hand_landmarks
-		# self.landmarks["right_hand"] = data.right_hand_landmarks
-		#
-		# for x in range(len(hand_names)):
-		# 	hand_name = hand_names[x]
-		# 	base_address = "/{}".format(hand_name)
-		# 	visible_address = "{}/visible".format(base_address)
-		#
-		# 	# Get coordinates from landmarks
-		# 	if self.landmarks[hand_name] is not None:
-		# 		udp.send(visible_address, True)
-		#
-		# 		for y in range(len(self.named_hand_landmarks)):
-		# 			landmark_name = self.named_hand_landmarks[y]
-		#
-		# 			if landmark_name in self.landmarks_to_render:
-		# 				landmark_data = self.landmarks[hand_name].landmark[y]
-		#
-		# 				x = scale_to_range(landmark_data.x, [1, 0], [0, 1]),
-		# 				y = landmark_data.y,
-		# 				raw_z = landmark_data.z
-		# 				z = raw_z * (10 ** count_zeros(raw_z))
-		# 				z = z if landmark_name == "wrist" else scale_to_range(z, [0, -1], [0, 1])
-		# 				hand_data = [x[0], y[0], z]
-		#
-		# 				landmark_address = "{}/{}/xyz".format(base_address, landmark_name)
-		# 				udp.send(landmark_address, hand_data)
-		# 	else:
-		# 		udp.send(visible_address, False)
+							norm_landmark_data["address"] = landmark_address
+							norm_landmark_data["value"] = [norm_x, y, norm_z]
+						norm_data.append(norm_landmark_data)
+		return norm_data
 
 	def display_data(self):
 		hand_names = list(self.landmarks.keys())
