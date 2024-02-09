@@ -1,5 +1,5 @@
-from src.VideoStream import VideoStream
-from src.UDP import UDP
+from src.video import VideoStream
+from src.udp import UDP
 from src.model import Model
 
 import tensorflow as tf
