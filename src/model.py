@@ -14,14 +14,10 @@ class Model:
 		]
 		self.landmarks_to_render = ["wrist", "thumb_tip", "index_finger_tip", "middle_finger_tip", "ring_finger_tip",
 		                            "pinky_tip"]
-		self.landmarks = {}
 
 		self.solution = mp.solutions
 		self.model = self.solution.hands.Hands(min_detection_confidence=min_detection_confidence,
-				                                             min_tracking_confidence=min_tracking_confidence)
-		# self.solution = mp.solutions
-		# self.model = self.solution.holistic.Holistic(min_detection_confidence=min_detection_confidence,
-		#                                              min_tracking_confidence=min_tracking_confidence)
+		                                       min_tracking_confidence=min_tracking_confidence)
 		self.drawing = self.solution.drawing_utils
 		self.drawing_styles = self.solution.drawing_styles
 
@@ -72,16 +68,12 @@ class Model:
 				if landmark_data:
 					udp.send(landmark_data["address"], landmark_data["value"])
 
-	def display_data(self):
-		hand_names = list(self.landmarks.keys())
-
-		for x in range(len(hand_names)):
-			hand_name = hand_names[x]
-
-			if self.landmarks[hand_name] is not None:
+	def display_data(self, data):
+		if data.multi_hand_landmarks:
+			for hand_landmarks in data.multi_hand_landmarks:
 				self.drawing.draw_landmarks(
 					self.image,
-					self.landmarks[hand_name],
+					hand_landmarks,
 					self.solution.holistic.HAND_CONNECTIONS,
 					self.drawing_styles.get_default_hand_landmarks_style(),
 					self.drawing_styles.get_default_hand_connections_style()
