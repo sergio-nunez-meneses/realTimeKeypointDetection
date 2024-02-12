@@ -41,7 +41,7 @@ class Model:
 			for hand_id, hand_landmarks in enumerate(data.multi_hand_landmarks):
 				hand_info = data.multi_handedness[hand_id].classification[0]
 
-				if hand_info.score > 0.95:
+				if hand_info.score > 0.9:
 					base_address = "/{}_hand".format(hand_info.label.lower())
 
 					for landmark_id, raw_landmark_data in enumerate(hand_landmarks.landmark):
@@ -58,15 +58,14 @@ class Model:
 
 							norm_landmark_data["address"] = landmark_address
 							norm_landmark_data["value"] = [norm_x, y, norm_z]
-						norm_data.append(norm_landmark_data)
+							norm_data.append(norm_landmark_data)
 		return norm_data
 
 	@staticmethod
 	def send_data(data, udp):
 		if data:
 			for landmark_data in data:
-				if landmark_data:
-					udp.send(landmark_data["address"], landmark_data["value"])
+				udp.send(landmark_data["address"], landmark_data["value"])
 
 	def display_data(self, data):
 		if data.multi_hand_landmarks:
